@@ -1,0 +1,10 @@
+astropy
+numpy
+emcee
+pandas
+psycopg[binary]
+jupyter
+matplotlib
+numpy
+pandas
+corner

@@ -32,7 +32,8 @@ setuptools.setup(
         "jupyter",
         "matplotlib",
         "numpy",
-        "pandas"
+        "pandas",
+        "corner"
     ],
     package_data={
     }
