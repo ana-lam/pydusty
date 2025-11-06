@@ -5,6 +5,7 @@ from pydusty.utils import calculate_molecular_absorption_fractions
 import emcee
 import os
 from pydusty.dusty import Dusty
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -73,9 +74,6 @@ class Emcee:
         '''
         calculate a weighted scaling
         '''
-        log_observed_fluxes = np.log10(observed_fluxes)
-        log_observed_fluxerrs = observed_fluxerrs/(observed_fluxes * np.log(10))
-        log_model_fluxes = np.log10(model_fluxes)
         if fixLstar:
             log_weighted_luminosity_scaling = fixLstar
         elif limits_only:
@@ -86,10 +84,10 @@ class Emcee:
             weighted_scaling = chi_square_limits_only/(np.sum(scalings_array))
             log_weighted_luminosity_scaling = np.log10(weighted_scaling)
         else:
-            scalings_array = np.sum((log_observed_fluxes - log_model_fluxes) / (log_observed_fluxerrs ** 2))
-            weights_array = np.sum(1 / log_observed_fluxerrs ** 2)
+            scale = (np.sum(observed_fluxes*model_fluxes/(observed_fluxerrs**2))
+                     /np.sum(model_fluxes**2/(observed_fluxerrs**2)))
 
-            log_weighted_luminosity_scaling = np.sum(scalings_array)/np.sum(weights_array)
+            log_weighted_luminosity_scaling = np.log10(scale)
 
         return log_weighted_luminosity_scaling
 
@@ -104,7 +102,10 @@ class Emcee:
         return log_outer_radius
 
     @staticmethod
-    def calculate_luminosity_chi2(observed_fluxes, observed_fluxerrs, scaled_model_fluxes,  limits_only=False, extrapolation=False):
+    def calculate_luminosity_chi2(observed_fluxes, observed_fluxerrs,
+                                  scaled_model_fluxes,  limits_only=False,
+                                  extrapolation=False,
+                                  error_underestimation_scaling_factor=0,):
         chi_Lobs = 0
         if not extrapolation and not limits_only:
             chi_array = np.zeros(len(observed_fluxes))
@@ -112,12 +113,17 @@ class Emcee:
             limit_mask = (observed_fluxes < 0)
             detection_mask = np.invert(limit_mask)
 
-            log_observed_fluxes = np.log10(observed_fluxes)
-            log_observed_fluxerrs = observed_fluxerrs / (observed_fluxes * np.log(10))
-            log_model_fluxes = np.log10(scaled_model_fluxes)
+            # log_observed_fluxes = np.log10(observed_fluxes)
+            # log_observed_fluxerrs = observed_fluxerrs / (observed_fluxes * np.log(10))
+            # log_model_fluxes = np.log10(scaled_model_fluxes)
 
-            chi_array[detection_mask] = ((log_observed_fluxes[detection_mask] - log_model_fluxes[detection_mask])/log_observed_fluxerrs[detection_mask])**2
-            chi_array[limit_mask] = (scaled_model_fluxes[limit_mask]/observed_fluxerrs[limit_mask])**2
+            chi_array[detection_mask] = (((observed_fluxes[detection_mask]
+                                          - scaled_model_fluxes[detection_mask]))**2
+                                         /(observed_fluxerrs[detection_mask]
+                                           + error_underestimation_scaling_factor
+                                           * observed_fluxes[detection_mask])**2)
+            chi_array[limit_mask] = (scaled_model_fluxes[limit_mask]
+                                     /observed_fluxerrs[limit_mask])**2
 
             chi_Lobs = np.sum(chi_array)
             eweight = 1.0
@@ -152,11 +158,15 @@ class Emcee:
                                                                  fixLstar=self.fixLstar)
 
         scaled_model_fluxes = interpolated_model_fluxes * 10**log_luminosity_scaling
-        chi2_lum = self.calculate_luminosity_chi2(observed_fluxes=mlum,
-                                                  observed_fluxerrs=merr,
-                                                  scaled_model_fluxes=scaled_model_fluxes,
-                                                  limits_only=self.limits_only,
-                                                  extrapolation=self.extrapolation)
+        chi2_lum = self.calculate_luminosity_chi2(
+            observed_fluxes=mlum,
+            observed_fluxerrs=merr,
+            scaled_model_fluxes=scaled_model_fluxes,
+            limits_only=self.limits_only,
+            extrapolation=self.extrapolation,
+            error_underestimation_scaling_factor=
+            self.dusty.parameters.error_underestimate_factor.value
+        )
 
         return chi2_lum, log_luminosity_scaling
 
@@ -306,8 +316,8 @@ class Emcee:
         if not self.continue_from_file:
             f = open(self.outfilename, "w")
             f.write(f'#Initial points\n')
-            for initpos in variable_parameter_initpos_nwalkers:
-                f.write(f'# {initpos}\n')
+            # for initpos in variable_parameter_initpos_nwalkers:
+            #     f.write(f'# {initpos}\n')
             f.write(f'#Variables: {variable_parameter_names}\n')
             f.write(f'#Priors: {variable_parameter_pritypes}\n')
             f.write(f'#Prior params: {variable_parameter_priparams}\n')
@@ -319,7 +329,7 @@ class Emcee:
             f.close()
 
         logger.info(
-            f'Running emcee by varyng parameters {variable_parameter_names} with initial values '
+            f'Running emcee by varying parameters {variable_parameter_names} with initial values '
             f'{variable_parameter_initpos} and priors {variable_parameter_priparams}')
 
         dtype = [("sluml", float), ("r1", float)]
@@ -328,7 +338,7 @@ class Emcee:
         # logger.info(sampler.random_state)
         # sampler.random_state.setter(state.get_state)
 
-        for result in sampler.sample(variable_parameter_initpos_nwalkers, iterations=self.ntrials, progress=True, store=True):
+        for result in tqdm(sampler.sample(variable_parameter_initpos_nwalkers, iterations=self.ntrials, progress=True, store=True)):
             print(os.getcwd())
             position = result.coords
             lp = result.log_prob

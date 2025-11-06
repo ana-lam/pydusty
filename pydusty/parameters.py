@@ -43,20 +43,31 @@ false_boolean_parameter = Parameter(name='generic_false_param', value=False, is_
 true_boolean_parameter = Parameter(name='generic_true_param', value=True, is_variable=False)
 default_tstarmin_parameter = Parameter(name='tstarmin', value=3500, is_variable=False)
 default_tstarmax_parameter = Parameter(name='tstarmax', value=48999, is_variable=False)
+default_tau_wavelength_micron_parameter = Parameter(name='tau_wav', value=0.55,
+                                                    is_variable=False)
+default_error_underestimate_factor = Parameter(name='error_underestimate_factor', value=0.0,
+                                               is_variable=False)
 class DustyParameters:
     def __init__(self,
-                 tstar: Parameter,
                  tdust: Parameter,
                  tau: Parameter,
                  shell_thickness: Parameter,
                  dust_type: Parameter,
                  blackbody: Parameter,
+                 tstar: Parameter = None,
                  tstarmin: Parameter = default_tstarmin_parameter,
                  tstarmax: Parameter = default_tstarmax_parameter,
                  custom_grain_distribution: Parameter = false_boolean_parameter,
+                 tau_wavelength_microns: Parameter = default_tau_wavelength_micron_parameter,
                  min_grain_size: Parameter = None,
                  max_grain_size: Parameter = None,
-                 ebv: Parameter = None
+                 ebv: Parameter = None,
+                 si_dl_abundance: Parameter = None,
+                 al_com_abundance: Parameter = None,
+                 error_underestimate_factor: Parameter = default_error_underestimate_factor,
+                 dust_composition_elements: list[str] = None,
+                 dust_composition_abundances: list[float] = None,
+                 custom_input_spectrum_file: Parameter = None,
                  ):
         self.tstar = tstar
         self.tdust = tdust
@@ -70,6 +81,11 @@ class DustyParameters:
         self.min_grain_size = min_grain_size
         self.max_grain_size = max_grain_size
         self.ebv = ebv
+        self.tau_wavelength_microns = tau_wavelength_microns
+        self.si_dl_abundance = si_dl_abundance
+        self.al_com_abundance = al_com_abundance
+        self.error_underestimate_factor = error_underestimate_factor
+        self.custom_input_spectrum_file = custom_input_spectrum_file
         if self.ebv is None:
             self.ebv = Parameter(name='ebv', value=0, is_variable=False)
 
@@ -84,6 +100,16 @@ class DustyParameters:
         self.parameter_dictionary = vars(self)
         self.parameter_list = [self.parameter_dictionary[x] for x in self.parameter_dictionary.keys() if isinstance(self.parameter_dictionary[x], Parameter)]
 
+        self.abundances_dict = {}
+        if dust_composition_abundances is not None:
+            if dust_composition_elements is None:
+                err = 'dust_composition_abundances specified without dust_composition_elements'
+                raise ValueError(err)
+            if len(dust_composition_elements) != len(dust_composition_abundances):
+                err = 'dust_composition_elements and dust_composition_abundances must be the same length'
+                raise ValueError(err)
+            for i in range(len(dust_composition_elements)):
+                self.abundances_dict[dust_composition_elements[i]] = dust_composition_abundances[i]
         # logger.debug(self.parameter_dictionary)
         # logger.debug(self.parameter_list)
 

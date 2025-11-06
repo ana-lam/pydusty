@@ -1,13 +1,13 @@
 import os
 
-from pydusty.dusty import Dusty, DustyParameters
+from pydusty.dusty import DustyCustomInputSpectrum, DustyParameters
 from pydusty.parameters import Parameter
 import argparse
 from pydusty.utils import getLogger
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--tstar", type=float, default=5000)
+    parser.add_argument("--input_file", type=str)
     parser.add_argument("--tau", type=float, default=50)
     parser.add_argument("--tau_wav_micron", type=float, default=100.0,
                         help="wavelength in um at which tau is specified")
@@ -26,10 +26,10 @@ if __name__ == '__main__':
 
     logger = getLogger(args.loglevel, args.logfile)
 
-    tstar = Parameter(name='tstar',
-                      value=args.tstar,
-                      is_variable=False)
 
+    custom_input_spectrum_file = Parameter(name='custom_input_spectrum_file',
+                                            value=args.input_file,
+                                            is_variable=False)
     tdust = Parameter(name='tdust',
                       value=args.tdust,
                       is_variable=True)
@@ -39,7 +39,7 @@ if __name__ == '__main__':
                     is_variable=False)
 
     blackbody = Parameter(name='blackbody',
-                          value=True)
+                          value=False)
     shell_thickness = Parameter(name='shell_thickness',
                                 value=args.thick)
     dust_type = Parameter(name='dust_type',
@@ -53,7 +53,7 @@ if __name__ == '__main__':
     tau_wav_micron = Parameter(name='tau_wav', value=args.tau_wav_micron,
                                is_variable=False)
     dusty_parameters = DustyParameters(
-        tstar=tstar,
+        custom_input_spectrum_file=custom_input_spectrum_file,
         tdust=tdust,
         tau=tau,
         blackbody=blackbody,
@@ -65,7 +65,7 @@ if __name__ == '__main__':
         tau_wavelength_microns=tau_wav_micron,
     )
 
-    dusty_runner = Dusty(parameters=dusty_parameters,
+    dusty_runner = DustyCustomInputSpectrum(parameters=dusty_parameters,
                                dusty_working_directory=args.workdir,
                                dusty_file_directory=args.dusty_file_dir
                                )
@@ -75,7 +75,9 @@ if __name__ == '__main__':
     dusty_runner.run()
 
     lam, flx, npt, r1, ierror = dusty_runner.get_results()
-    with open(f'{args.workdir}/sed_{tstar.value}_{tdust.value}_{tau.value}_{dust_type.value}_{shell_thickness.value}_{tau_wav_micron.value}um.dat', 'w') as f:
+    with open(f"{args.workdir}/sed_{args.input_file.split('/')[-1].split('.dat')[0]}_"
+              f"{tdust.value}_{tau.value}_{dust_type.value}_{shell_thickness.value}_"
+              f"{tau_wav_micron.value}um.dat", 'w') as f:
         f.write(f"# {r1}\n")
         f.write("lam, flux\n")
         for ind in range(len(lam)):
