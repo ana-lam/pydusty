@@ -15,15 +15,9 @@ Make a directory `<pydusty_data_path>/dusty_run`. <br>
 From the pydusty directory, run `python examples/run_dusty_mcmc.py <pydusty_data_path>/lums_WISE_J175749.76-075314.9_ebv1.18_nodisterr.dat <pydusty_data_path>/dusty_run --loglevel INFO --nprocesses 4`. <br>
 The full code takes a couple hours to run, but if it runs without interruptions for ~5 minutes, your install has worked correctly.
 
-If you run into array limit issues with your dusty executable you can update the array bounds like so (I update the limits to 250 but you can do more...):
+If you run into compile issues you might need to add the `-std=legacy` as stated in [ivezic/dusty#7](https://github.com/virajkaram/pydusty/compare/main...ana-lam:pydusty:main) and recompile like so:
 ```
-cd pydusty/data/dusty_files
-cp dusty.f dusty_original.f
-sed -i '' 's/(3,200)/(3,250)/g' dusty.f
-```
-and recompile like so:
-```
-gfortran -std=legacy -fallow-argument-mismatch -fno-automatic -fno-align-commons -O2 -o dusty dusty.f
+gfortran gfortran dustyV2.f -o dusty -std=legacy
 ```
 
 (Better tests will follow)
